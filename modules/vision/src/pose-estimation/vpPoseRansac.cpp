@@ -62,6 +62,24 @@
 #define eps 1e-6
 
 
+namespace {
+  struct DegenerateEqual {
+      DegenerateEqual( const vpPoint &pt ) : m_pt(pt) { }
+
+      bool operator() (const vpPoint &pt) {
+        return (
+                (std::fabs(m_pt.oP[0] - pt.oP[0]) < eps &&
+                 std::fabs(m_pt.oP[1] - pt.oP[1]) < eps &&
+                 std::fabs(m_pt.oP[2] - pt.oP[2]) < eps) ||
+                (std::fabs(m_pt.p[0] - pt.p[0]) < eps &&
+                 std::fabs(m_pt.p[1] - pt.p[1]) < eps)
+              );
+      }
+
+      vpPoint m_pt;
+  };
+}
+
 /*! 
   Compute the pose using the Ransac approach. 
  
@@ -108,6 +126,7 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
     vpHomogeneousMatrix cMo_tmp;
     cur_outliers.clear();
     cur_randoms.clear();
+    std::vector<vpPoint> cur_inliers;
 
     //Vector of used points, initialized at false for all points
     std::vector<bool> usedPt(size, false);
@@ -129,25 +148,33 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       //Mark this point as already picked
       usedPt[r_] = true;
 
-      std::vector<vpPoint>::const_iterator iter = listP.begin();
-      std::advance(iter, r_);
-      vpPoint pt = *iter;
+//      std::vector<vpPoint>::const_iterator iter = listP.begin();
+//      std::advance(iter, r_);
+//      vpPoint pt = *iter;
+      vpPoint pt = listP[r_];
 
-      bool degenerate = false;
-      for(std::vector<vpPoint>::const_iterator it = poseMin.listP.begin(); it != poseMin.listP.end(); ++it){
-        vpPoint ptdeg = *it;
-        if( ((fabs(pt.get_x() - ptdeg.get_x()) < 1e-6) && (fabs(pt.get_y() - ptdeg.get_y()) < 1e-6))  ||
-            ((fabs(pt.get_oX() - ptdeg.get_oX()) < 1e-6) && (fabs(pt.get_oY() - ptdeg.get_oY()) < 1e-6) && (fabs(pt.get_oZ() - ptdeg.get_oZ()) < 1e-6))){
-          degenerate = true;
-          break;
-        }
-      }
-      if(!degenerate) {
+//      bool degenerate = false;
+//      for(std::vector<vpPoint>::const_iterator it = poseMin.listP.begin(); it != poseMin.listP.end(); ++it){
+//        vpPoint ptdeg = *it;
+//        if( ((fabs(pt.get_x() - ptdeg.get_x()) < 1e-6) && (fabs(pt.get_y() - ptdeg.get_y()) < 1e-6))  ||
+//            ((fabs(pt.get_oX() - ptdeg.get_oX()) < 1e-6) && (fabs(pt.get_oY() - ptdeg.get_oY()) < 1e-6) && (fabs(pt.get_oZ() - ptdeg.get_oZ()) < 1e-6))){
+//          degenerate = true;
+//          break;
+//        }
+//      }
+      if ( std::find_if(poseMin.listP.begin(), poseMin.listP.end(), DegenerateEqual(pt)) == poseMin.listP.end() ) {
         poseMin.addPoint(pt);
         cur_randoms.push_back(r_);
         //Increment the number of points picked
         i++;
       }
+
+//      if(!degenerate) {
+//        poseMin.addPoint(pt);
+//        cur_randoms.push_back(r_);
+//        //Increment the number of points picked
+//        i++;
+//      }
     }
 
     if(poseMin.npt < nbMinRandom) {
@@ -232,29 +259,37 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
           if(error < ransacThreshold) {
             // the point is considered as inlier if the error is below the threshold
             // But, we need also to check if it is not a degenerate point
-            bool degenerate = false;
+//            bool degenerate = false;
 
-            for(unsigned int it_inlier_index = 0; it_inlier_index< cur_consensus.size(); it_inlier_index++){
-//              std::list<vpPoint>::const_iterator it_point = listP.begin();
-//              std::advance(it_point, cur_consensus[it_inlier_index]);
-//              pt = *it_point;
-              pt = listP[cur_consensus[it_inlier_index]];
+//            for(unsigned int it_inlier_index = 0; it_inlier_index< cur_consensus.size(); it_inlier_index++){
+////              std::list<vpPoint>::const_iterator it_point = listP.begin();
+////              std::advance(it_point, cur_consensus[it_inlier_index]);
+////              pt = *it_point;
+//              pt = listP[cur_consensus[it_inlier_index]];
 
-              vpPoint ptdeg = *it;
-              if( ((fabs(pt.get_x() - ptdeg.get_x()) < 1e-6) && (fabs(pt.get_y() - ptdeg.get_y()) < 1e-6))  ||
-                  ((fabs(pt.get_oX() - ptdeg.get_oX()) < 1e-6) && (fabs(pt.get_oY() - ptdeg.get_oY()) < 1e-6) && (fabs(pt.get_oZ() - ptdeg.get_oZ()) < 1e-6))){
-                degenerate = true;
-                break;
-              }
-            }
+//              vpPoint ptdeg = *it;
+//              if( ((fabs(pt.get_x() - ptdeg.get_x()) < 1e-6) && (fabs(pt.get_y() - ptdeg.get_y()) < 1e-6))  ||
+//                  ((fabs(pt.get_oX() - ptdeg.get_oX()) < 1e-6) && (fabs(pt.get_oY() - ptdeg.get_oY()) < 1e-6) && (fabs(pt.get_oZ() - ptdeg.get_oZ()) < 1e-6))){
+//                degenerate = true;
+//                break;
+//              }
+//            }
 
-            if(!degenerate) {
+            if ( std::find_if(cur_inliers.begin(), cur_inliers.end(), DegenerateEqual(*it)) == cur_inliers.end() ) {
               nbInliersCur++;
               cur_consensus.push_back(iter);
-            }
-            else {
+              cur_inliers.push_back(*it);
+            } else {
               cur_outliers.push_back(iter);
             }
+
+//            if(!degenerate) {
+//              nbInliersCur++;
+//              cur_consensus.push_back(iter);
+//            }
+//            else {
+//              cur_outliers.push_back(iter);
+//            }
           }
           else {
             cur_outliers.push_back(iter);
