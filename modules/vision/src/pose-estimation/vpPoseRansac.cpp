@@ -96,6 +96,7 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
 
   bool foundSolution = false;
 
+  double t_ransac = vpTime::measureTimeMs();
   while (nbTrials < ransacMaxTrials && nbInliers < (unsigned)ransacNbInlierConsensus)
   {
     //Hold the list of the index of the inliers (points in the consensus set)
@@ -290,6 +291,8 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       }
     }
   }
+  t_ransac = vpTime::measureTimeMs() - t_ransac;
+  std::cout << "Original version t_ransac: " << t_ransac << " ms" << std::endl;
 
   if(foundSolution) {
 //    std::cout << "Nombre d'inliers " << nbInliers << std::endl ;
@@ -374,7 +377,10 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
         }
 
         pose.setCovarianceComputation(computeCovariance);
+        double t_vvs = vpTime::measureTimeMs();
         pose.computePose(vpPose::VIRTUAL_VS, cMo);
+        t_vvs = vpTime::measureTimeMs() - t_vvs;
+        std::cout << "Original version t_vvs=: " << t_vvs << " ms" << std::endl;
 
         //In some rare cases, the final pose could not respect the pose criterion even
         //if the 4 minimal points picked respect the pose criterion.
