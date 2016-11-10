@@ -129,9 +129,10 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       //Mark this point as already picked
       usedPt[r_] = true;
 
-      std::vector<vpPoint>::const_iterator iter = listP.begin();
-      std::advance(iter, r_);
-      vpPoint pt = *iter;
+//      std::vector<vpPoint>::const_iterator iter = listP.begin();
+//      std::advance(iter, r_);
+//      vpPoint pt = *iter;
+      vpPoint pt = listP[r_];
 
       bool degenerate = false;
       for(std::vector<vpPoint>::const_iterator it = poseMin.listP.begin(); it != poseMin.listP.end(); ++it){
