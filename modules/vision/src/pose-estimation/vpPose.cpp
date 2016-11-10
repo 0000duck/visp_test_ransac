@@ -197,16 +197,16 @@ vpPose::coplanar(int &coplanar_plane_type)
 
   double x1=0,x2=0,x3=0,y1=0,y2=0,y3=0,z1=0,z2=0,z3=0 ;
 
-  std::list<vpPoint>::const_iterator it = listP.begin();
+  std::vector<vpPoint>::const_iterator it = listP.begin();
 
   vpPoint P1, P2, P3 ;
 
   // Get three 3D points that are not collinear and that is not at origin
   bool degenerate = true;
   bool not_on_origin = true;
-  std::list<vpPoint>::const_iterator it_tmp;
+  std::vector<vpPoint>::const_iterator it_tmp;
 
-  std::list<vpPoint>::const_iterator it_i, it_j, it_k;
+  std::vector<vpPoint>::const_iterator it_i, it_j, it_k;
   for (it_i=listP.begin(); it_i != listP.end(); ++it_i) {
     if (degenerate == false) {
       //std::cout << "Found a non degenerate configuration" << std::endl;
@@ -339,7 +339,7 @@ vpPose::computeResidual(const vpHomogeneousMatrix &cMo) const
 {
   double residual_ = 0 ;
   vpPoint P ;
-  for(std::list<vpPoint>::const_iterator it=listP.begin(); it != listP.end(); ++it)
+  for(std::vector<vpPoint>::const_iterator it=listP.begin(); it != listP.end(); ++it)
   {
     P = *it;
     double x = P.get_x() ;
@@ -568,7 +568,7 @@ void
 vpPose::printPoint()
 {
   vpPoint P;
-  for(std::list<vpPoint>::const_iterator it=listP.begin(); it != listP.end(); ++it)
+  for(std::vector<vpPoint>::const_iterator it=listP.begin(); it != listP.end(); ++it)
   {
     P = *it ;
 
@@ -612,7 +612,7 @@ vpPose::displayModel(vpImage<unsigned char> &I,
 { 
   vpPoint P ;
   vpImagePoint ip;
-  for(std::list<vpPoint>::const_iterator it=listP.begin(); it != listP.end(); ++it)
+  for(std::vector<vpPoint>::const_iterator it=listP.begin(); it != listP.end(); ++it)
   {
     P = *it;
     vpMeterPixelConversion::convertPoint(cam, P.p[0], P.p[1], ip) ;
@@ -635,7 +635,7 @@ vpPose::displayModel(vpImage<vpRGBa> &I,
 { 
   vpPoint P ;
   vpImagePoint ip;
-  for(std::list<vpPoint>::const_iterator it=listP.begin(); it != listP.end(); ++it)
+  for(std::vector<vpPoint>::const_iterator it=listP.begin(); it != listP.end(); ++it)
   {
     P = *it;
     vpMeterPixelConversion::convertPoint(cam, P.p[0], P.p[1], ip) ;

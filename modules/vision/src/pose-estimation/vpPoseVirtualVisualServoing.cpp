@@ -72,11 +72,11 @@ vpPose::poseVirtualVS(vpHomogeneousMatrix & cMo)
     vpColVector v ;
     
     vpPoint P;
-    std::list<vpPoint> lP ;
+    std::vector<vpPoint> lP ;
 
     // create sd
     unsigned int k =0 ;
-    for (std::list<vpPoint>::const_iterator it = listP.begin(); it != listP.end(); ++it)
+    for (std::vector<vpPoint>::const_iterator it = listP.begin(); it != listP.end(); ++it)
     {
       P = *it;
       sd[2*k] = P.get_x() ;
@@ -93,7 +93,7 @@ vpPose::poseVirtualVS(vpHomogeneousMatrix & cMo)
 
       // Compute the interaction matrix and the error
       k =0 ;
-      for (std::list<vpPoint>::const_iterator it = lP.begin(); it != lP.end(); ++it)
+      for (std::vector<vpPoint>::const_iterator it = lP.begin(); it != lP.end(); ++it)
       {
         P = *it;
         // forward projection of the 3D model for a given pose
@@ -184,7 +184,7 @@ vpPose::poseVirtualVSrobust(vpHomogeneousMatrix & cMo)
 
     // create sd
     unsigned int k_ =0 ;
-    for (std::list<vpPoint>::const_iterator it = listP.begin(); it != listP.end(); ++it)
+    for (std::vector<vpPoint>::const_iterator it = listP.begin(); it != listP.end(); ++it)
     {
       P = *it;
       sd[2*k_] = P.get_x() ;

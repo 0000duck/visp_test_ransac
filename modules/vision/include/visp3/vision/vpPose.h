@@ -89,7 +89,7 @@ public:
     } vpPoseMethodType;
 
   unsigned int npt ;       //!< number of point used in pose computation
-  std::list<vpPoint> listP ;     //!< array of point (use here class vpPoint)
+  std::vector<vpPoint> listP ;     //!< array of point (use here class vpPoint)
 
   double residual ;     //!< compute the residual in meter
 
@@ -227,7 +227,7 @@ public:
     std::vector<vpPoint> vectorOfPoints(listP.size());
 
     size_t i = 0;
-    for(std::list<vpPoint>::const_iterator it = listP.begin(); it != listP.end(); ++it, i++) {
+    for(std::vector<vpPoint>::const_iterator it = listP.begin(); it != listP.end(); ++it, i++) {
       vectorOfPoints[i] = *it;
     }
 

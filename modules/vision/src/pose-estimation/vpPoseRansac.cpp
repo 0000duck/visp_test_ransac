@@ -96,6 +96,7 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
 
   bool foundSolution = false;
 
+  double t_ransac = vpTime::measureTimeMs();
   while (nbTrials < ransacMaxTrials && nbInliers < (unsigned)ransacNbInlierConsensus)
   {
     //Hold the list of the index of the inliers (points in the consensus set)
@@ -128,12 +129,12 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       //Mark this point as already picked
       usedPt[r_] = true;
 
-      std::list<vpPoint>::const_iterator iter = listP.begin();
+      std::vector<vpPoint>::const_iterator iter = listP.begin();
       std::advance(iter, r_);
       vpPoint pt = *iter;
 
       bool degenerate = false;
-      for(std::list<vpPoint>::const_iterator it = poseMin.listP.begin(); it != poseMin.listP.end(); ++it){
+      for(std::vector<vpPoint>::const_iterator it = poseMin.listP.begin(); it != poseMin.listP.end(); ++it){
         vpPoint ptdeg = *it;
         if( ((fabs(pt.get_x() - ptdeg.get_x()) < 1e-6) && (fabs(pt.get_y() - ptdeg.get_y()) < 1e-6))  ||
             ((fabs(pt.get_oX() - ptdeg.get_oX()) < 1e-6) && (fabs(pt.get_oY() - ptdeg.get_oY()) < 1e-6) && (fabs(pt.get_oZ() - ptdeg.get_oZ()) < 1e-6))){
@@ -220,7 +221,7 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       {
         unsigned int nbInliersCur = 0;
         unsigned int iter = 0;
-        for (std::list<vpPoint>::const_iterator it = listP.begin(); it != listP.end(); ++it)
+        for (std::vector<vpPoint>::const_iterator it = listP.begin(); it != listP.end(); ++it)
         {
           vpPoint pt = *it;
           vpPoint p(pt) ;
@@ -234,9 +235,10 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
             bool degenerate = false;
 
             for(unsigned int it_inlier_index = 0; it_inlier_index< cur_consensus.size(); it_inlier_index++){
-              std::list<vpPoint>::const_iterator it_point = listP.begin();
-              std::advance(it_point, cur_consensus[it_inlier_index]);
-              pt = *it_point;
+//              std::list<vpPoint>::const_iterator it_point = listP.begin();
+//              std::advance(it_point, cur_consensus[it_inlier_index]);
+//              pt = *it_point;
+              pt = listP[cur_consensus[it_inlier_index]];
 
               vpPoint ptdeg = *it;
               if( ((fabs(pt.get_x() - ptdeg.get_x()) < 1e-6) && (fabs(pt.get_y() - ptdeg.get_y()) < 1e-6))  ||
@@ -290,6 +292,8 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       }
     }
   }
+  t_ransac = vpTime::measureTimeMs() - t_ransac;
+  std::cout << "Original version t_ransac: " << t_ransac << " ms" << std::endl;
 
   if(foundSolution) {
 //    std::cout << "Nombre d'inliers " << nbInliers << std::endl ;
@@ -319,9 +323,10 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       vpPose pose ;
       for(unsigned i = 0 ; i < best_consensus.size(); i++)
       {
-        std::list<vpPoint>::const_iterator iter = listP.begin();
-        std::advance(iter, best_consensus[i]);
-        vpPoint pt = *iter;
+//        std::list<vpPoint>::const_iterator iter = listP.begin();
+//        std::advance(iter, best_consensus[i]);
+//        vpPoint pt = *iter;
+        vpPoint pt = listP[best_consensus[i]];
 
         pose.addPoint(pt) ;
         ransacInliers.push_back(pt);
@@ -374,7 +379,10 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
         }
 
         pose.setCovarianceComputation(computeCovariance);
+        double t_vvs = vpTime::measureTimeMs();
         pose.computePose(vpPose::VIRTUAL_VS, cMo);
+        t_vvs = vpTime::measureTimeMs() - t_vvs;
+        std::cout << "Original version t_vvs=: " << t_vvs << " ms" << std::endl;
 
         //In some rare cases, the final pose could not respect the pose criterion even
         //if the 4 minimal points picked respect the pose criterion.
