@@ -2069,55 +2069,12 @@ bool testRansac(const std::vector<vpPoint> &bunnyModelPoints_original, const std
   return true;
 }
 
-#include <visp3/io/vpImageIo.h>
-#include <visp3/core/vpImageFilter.h>
-
 /*!
   \example testPoseRansac2.cpp
 
   Compute the pose of a 3D object using the Ransac method.
 */
 int main() {
-//  vpImage<unsigned char> big_image;
-//  vpImageIo::read(big_image, "/home/strinh/Images/Big_Images/Paine in the Snow.jpg");
-
-//  std::vector<vpImage<unsigned char> > big_images;
-//  std::vector<vpImage<double> > results(4);
-
-//  big_images.push_back(big_image);
-//  big_images.push_back(big_image);
-//  big_images.push_back(big_image);
-//  big_images.push_back(big_image);
-
-//  double t = vpTime::measureTimeMs();
-//#pragma omp parallel
-//  {
-//    #pragma omp for
-//    for (int i = 0; i < 4; i++) {
-//      vpImageFilter::gaussianBlur(big_images[i], results[i], 21);
-//    }
-//  }
-//  t = vpTime::measureTimeMs() - t;
-//  std::cout << "t=" << t << " ms" << std::endl;
-
-//  return 0;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   //vpPose::computeRansacIterations
   int sample_sizes[] = {2, 3, 4, 5, 6, 7, 8};
   double epsilon[] = {0.05, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5};

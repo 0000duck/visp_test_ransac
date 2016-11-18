@@ -564,6 +564,7 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
           std::vector<unsigned int> cur_outliers;
           //Hold the list of the index of the points randomly picked
           std::vector<unsigned int> cur_randoms;
+          //Hold the list of the current inliers points to avoid to add a degenerate point if the flag is set
           std::vector<vpPoint> cur_inliers;
 
           double r, r_lagrange, r_dementhon;
@@ -697,12 +698,6 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
         }
       }
     }
-
-//    std::cout << "foundSolutionWithConsensus=" << foundSolutionWithConsensus << std::endl;
-//    std::cout << "foundSolution=" << foundSolution << std::endl;
-//    std::cout << "best_consensus=" << best_consensus.size() << std::endl;
-//    std::cout << "best_randoms=" << best_randoms.size() << std::endl;
-//    std::cout << "nb_best_inliers=" << nb_best_inliers << std::endl;
 #else
     std::vector<vpThread *> threads((size_t) nbThreads);
     std::vector<RansacFunctor> ransac_func((size_t) nbThreads);
@@ -769,7 +764,6 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
 #endif
   } else {
     //Sequential RANSAC
-#if 0
     RansacFunctor sequentialRansac(cMo, ransacNbInlierConsensus, ransacMaxTrials, ransacThreshold,
                                    0, ransacFlags, listOfUniquePoints, func);
     sequentialRansac();
@@ -779,179 +773,6 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       nbInliers = sequentialRansac.getNbInliers();
       best_consensus = sequentialRansac.getBestConsensus();
     }
-#else
-    unsigned int initial_seed = 0;
-    while (nbTrials < ransacMaxTrials && nbInliers < (unsigned) ransacNbInlierConsensus)
-    {
-      //Hold the list of the index of the inliers (points in the consensus set)
-      cur_consensus.clear();
-
-      //Use a temporary variable because if not, the cMo passed in parameters will be modified when
-      // we compute the pose for the minimal sample sets but if the pose is not correct when we pass
-      // a function pointer we do not want to modify the cMo passed in parameters
-      vpHomogeneousMatrix cMo_tmp;
-      cur_outliers.clear();
-      cur_randoms.clear();
-      std::vector<vpPoint> cur_inliers;
-
-      //Vector of used points, initialized at false for all points
-      std::vector<bool> usedPt(size, false);
-
-      vpPose poseMin;
-      for(unsigned int i = 0; i < nbMinRandom;)
-      {
-        if((size_t) std::count(usedPt.begin(), usedPt.end(), true) == usedPt.size()) {
-          //All points was picked once, break otherwise we stay in an infinite loop
-          break;
-        }
-
-        //Pick a point randomly
-//        unsigned int r_ = (unsigned int) rand() % size;
-        unsigned int r_ = (unsigned int) rand_r(&initial_seed) % size;
-        while(usedPt[r_]) {
-          //If already picked, pick another point randomly
-//          r_ = (unsigned int) rand() % size;
-          r_ = (unsigned int) rand_r(&initial_seed) % size;
-        }
-        //Mark this point as already picked
-        usedPt[r_] = true;
-        vpPoint pt = listOfUniquePoints[r_];
-
-        bool degenerate = false;
-        if (checkDegeneratePoints) {
-          if ( std::find_if(poseMin.listOfPoints.begin(), poseMin.listOfPoints.end(), FindDegeneratePoint(pt)) !=  poseMin.listOfPoints.end()) {
-            degenerate = true;
-          }
-        }
-
-        if (!degenerate) {
-          poseMin.addPoint(pt);
-          cur_randoms.push_back(r_);
-          //Increment the number of points picked
-          i++;
-        }
-      }
-
-      if(poseMin.npt < nbMinRandom) {
-        nbTrials++;
-        continue;
-      }
-
-      //Flags set if pose computation is OK
-      bool is_valid_lagrange = false;
-      bool is_valid_dementhon = false;
-
-      //Set maximum value for residuals
-      r_lagrange = DBL_MAX;
-      r_dementhon = DBL_MAX;
-
-      try {
-        poseMin.computePose(vpPose::LAGRANGE, cMo_lagrange);
-        r_lagrange = poseMin.computeResidual(cMo_lagrange);
-        is_valid_lagrange = true;
-      } catch(...) {
-      }
-
-      try {
-        poseMin.computePose(vpPose::DEMENTHON, cMo_dementhon);
-        r_dementhon = poseMin.computeResidual(cMo_dementhon);
-        is_valid_dementhon = true;
-      } catch(...) {
-      }
-
-      //If residual returned is not a number (NAN), set valid to false
-      if(vpMath::isNaN(r_lagrange)) {
-        is_valid_lagrange = false;
-        r_lagrange = DBL_MAX;
-      }
-
-      if(vpMath::isNaN(r_dementhon)) {
-        is_valid_dementhon = false;
-        r_dementhon = DBL_MAX;
-      }
-
-      //If at least one pose computation is OK,
-      //we can continue, otherwise pick another random set
-      if(is_valid_lagrange || is_valid_dementhon) {
-        if (r_lagrange < r_dementhon) {
-          r = r_lagrange;
-          cMo_tmp = cMo_lagrange;
-        }
-        else {
-          r = r_dementhon;
-          cMo_tmp = cMo_dementhon;
-        }
-        r = sqrt(r) / (double) nbMinRandom;
-
-        //Filter the pose using some criterion (orientation angles, translations, etc.)
-        bool isPoseValid = true;
-        if(func != NULL) {
-          isPoseValid = func(&cMo_tmp);
-          if(isPoseValid) {
-            cMo = cMo_tmp;
-          }
-        } else {
-          //No post filtering on pose, so copy cMo_temp to cMo
-          cMo = cMo_tmp;
-        }
-
-        if (isPoseValid && r < ransacThreshold)
-        {
-          unsigned int nbInliersCur = 0;
-          unsigned int iter = 0;
-          for (std::vector<vpPoint>::const_iterator it = listOfUniquePoints.begin(); it != listOfUniquePoints.end(); ++it)
-          {
-            vpPoint pt = *it;
-            vpPoint p(pt) ;
-            p.track(cMo) ;
-
-            double d = vpMath::sqr(p.get_x() - pt.get_x()) + vpMath::sqr(p.get_y() - pt.get_y()) ;
-            double error = sqrt(d) ;
-            if(error < ransacThreshold) {
-              bool degenerate = false;
-              if (checkDegeneratePoints) {
-                if ( std::find_if(cur_inliers.begin(), cur_inliers.end(), FindDegeneratePoint(pt)) != cur_inliers.end() ) {
-                  degenerate = true;
-                }
-              }
-
-              if (!degenerate) {
-                // the point is considered as inlier if the error is below the threshold
-                nbInliersCur++;
-                cur_consensus.push_back(iter);
-                cur_inliers.push_back(*it);
-              } else {
-                cur_outliers.push_back(iter);
-              }
-            }
-            else {
-              cur_outliers.push_back(iter);
-            }
-
-            iter++;
-          }
-
-          if(nbInliersCur > nbInliers)
-          {
-            foundSolution = true;
-            best_consensus = cur_consensus;
-            nbInliers = nbInliersCur;
-          }
-
-          nbTrials++;
-
-          if(nbTrials >= ransacMaxTrials) {
-            foundSolution = true;
-          }
-        }
-        else {
-          nbTrials++;
-        }
-      } else {
-        nbTrials++;
-      }
-    }
-#endif
   }
 
   if(foundSolution) {
