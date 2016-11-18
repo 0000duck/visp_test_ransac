@@ -191,28 +191,28 @@ namespace {
 }
 
 bool vpPose::RansacFunctor::poseRansacImpl() {
-  std::vector<unsigned int> cur_consensus;
-  std::vector<unsigned int> cur_outliers;
-  std::vector<unsigned int> cur_randoms;
   unsigned int size = (unsigned int) m_listOfUniquePoints.size();
   int nbTrials = 0;
   unsigned int nbMinRandom = 4;
-  double r, r_lagrange, r_dementhon;
-  vpHomogeneousMatrix cMo_lagrange, cMo_dementhon;
 
   bool foundSolution = false;
   while (nbTrials < m_ransacMaxTrials && m_nbInliers < (unsigned int) m_ransacNbInlierConsensus)
   {
     //Hold the list of the index of the inliers (points in the consensus set)
-    cur_consensus.clear();
+    std::vector<unsigned int> cur_consensus;
+    //Hold the list of the index of the outliers
+    std::vector<unsigned int> cur_outliers;
+    //Hold the list of the index of the points randomly picked
+    std::vector<unsigned int> cur_randoms;
+    //Hold the list of the current inliers points to avoid to add a degenerate point if the flag is set
+    std::vector<vpPoint> cur_inliers;
 
+    double r, r_lagrange, r_dementhon;
+    vpHomogeneousMatrix cMo_lagrange, cMo_dementhon;
     //Use a temporary variable because if not, the cMo passed in parameters will be modified when
     // we compute the pose for the minimal sample sets but if the pose is not correct when we pass
     // a function pointer we do not want to modify the cMo passed in parameters
     vpHomogeneousMatrix cMo_tmp;
-    cur_outliers.clear();
-    cur_randoms.clear();
-    std::vector<vpPoint> cur_inliers;
 
     //Vector of used points, initialized at false for all points
     std::vector<bool> usedPt(size, false);
@@ -227,6 +227,7 @@ bool vpPose::RansacFunctor::poseRansacImpl() {
 
       //Pick a point randomly
       unsigned int r_ = (unsigned int) rand_r(&m_initial_seed) % size;
+
       while(usedPt[r_]) {
         //If already picked, pick another point randomly
         r_ = (unsigned int) rand_r(&m_initial_seed) % size;
@@ -315,7 +316,7 @@ bool vpPose::RansacFunctor::poseRansacImpl() {
       {
         unsigned int nbInliersCur = 0;
         unsigned int iter = 0;
-        for (std::vector<vpPoint>::const_iterator it = m_listOfUniquePoints.begin(); it != m_listOfUniquePoints.end(); ++it)
+        for (std::vector<vpPoint>::const_iterator it = m_listOfUniquePoints.begin(); it != m_listOfUniquePoints.end(); ++it, iter++)
         {
           vpPoint pt = *it;
           vpPoint p(pt) ;
@@ -343,8 +344,6 @@ bool vpPose::RansacFunctor::poseRansacImpl() {
           else {
             cur_outliers.push_back(iter);
           }
-
-          iter++;
         }
 
         if(nbInliersCur > m_nbInliers)
@@ -397,15 +396,10 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
   ransacInliers.clear();
   ransacInlierIndex.clear();
 
-  srand(0); //Fix seed here so we will have the same pseudo-random series at each run.
   std::vector<unsigned int> best_consensus;
-  std::vector<unsigned int> cur_consensus;
-  std::vector<unsigned int> cur_outliers;
-  std::vector<unsigned int> cur_randoms;
-  int nbTrials = 0;
-  unsigned int nbMinRandom = 4 ;
+  unsigned int nbMinRandom = 4;
   unsigned int nbInliers = 0;
-  double r, r_lagrange, r_dementhon;
+  double r_lagrange, r_dementhon;
 
   vpHomogeneousMatrix cMo_lagrange, cMo_dementhon;
 
@@ -497,40 +491,47 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
   }
 
 
-    bool executeParallelVersion = useParallelRansac;
-#if !defined(VISP_HAVE_PTHREAD) && !defined(_WIN32)
-  if (useParallelRansac) {
-    std::cerr << "Need Pthread or WIN32 thread API to use parallel RANSAC!" << std::endl;
-  }
-  executeParallelVersion = false;
+  bool executeParallelVersion = useParallelRansac;
+  int nbThreads = 1;
+
+  if (executeParallelVersion) {
+#if defined (VISP_HAVE_PTHREAD) || defined (_WIN32)
+#  define VP_THREAD_OK
 #endif
 
-  int nbThreads = 1;
-  if (executeParallelVersion) {
+#if !defined (VP_THREAD_OK) && !defined (VISP_HAVE_OPENMP)
+    executeParallelVersion = false;
+    std::cerr << "Pthread or WIN32 API or OpenMP is needed to use the parallel RANSAC version." << std::endl;
+#elif !defined (VP_THREAD_OK)
+    //Use OpenMP
+    #define PARALLEL_RANSAC_OPEN_MP
+#elif !defined (VISP_HAVE_OPENMP)
+    if(nbParallelRansacThreads <= 0) {
+      //Cannot get the number of CPU threads so use the sequential mode
+      executeParallelVersion = false;
+      std::cerr << "OpenMP is needed to get the number of CPU threads so use the sequential mode instead." << std::endl;
+    } else {
+      nbThreads = nbParallelRansacThreads;
+      if (nbThreads == 1) {
+        executeParallelVersion = false
+      }
+    }
+#elif defined (VP_THREAD_OK) && defined (VISP_HAVE_OPENMP)
     if (nbParallelRansacThreads <= 0) {
       //Use OpenMP to get the number of CPU threads
-    #ifdef VISP_HAVE_OPENMP
       nbThreads = omp_get_max_threads();
       if(nbThreads <= 1) {
         nbThreads = 1;
         executeParallelVersion = false;
       }
-    #else
-      //Cannot get the number of CPU threads so use the sequential mode
-      executeParallelVersion = false;
-      std::cerr << "OpenMP is needed to get the number of CPU threads so use the sequential mode instead." << std::endl;
-    #endif
-    } else {
-      nbThreads = nbParallelRansacThreads;
     }
+#endif
   }
 
   bool foundSolution = false;
 
   if(executeParallelVersion) {
-#define USE_OPEN_MP 1
-
-#if USE_OPEN_MP
+#if defined (PARALLEL_RANSAC_OPEN_MP)
     //True if we found a consensus set with a size > ransacNbInlierConsensus
     bool foundSolutionWithConsensus = false;
     //List of points picked randomly (minimal sample set, MSS)
@@ -629,6 +630,17 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
               is_valid_dementhon = true;
             } catch(...) { }
 
+            //If residual returned is not a number (NAN), set valid to false
+            if(vpMath::isNaN(r_lagrange)) {
+              is_valid_lagrange = false;
+              r_lagrange = DBL_MAX;
+            }
+
+            if(vpMath::isNaN(r_dementhon)) {
+              is_valid_dementhon = false;
+              r_dementhon = DBL_MAX;
+            }
+
             //If at least one pose computation is OK,
             //we can continue, otherwise pick another random set
             if(is_valid_lagrange || is_valid_dementhon) {
@@ -697,6 +709,8 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
           }
         }
       }
+
+      nbInliers = best_consensus.size();
     }
 #else
     std::vector<vpThread *> threads((size_t) nbThreads);
@@ -707,11 +721,11 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       unsigned int initial_seed = i; //((unsigned int) time(NULL) ^ i);
       if(i < (size_t) nbThreads-1) {
         ransac_func[i] = RansacFunctor(cMo, ransacNbInlierConsensus, splitTrials, ransacThreshold,
-                                       initial_seed, ransacFlags, listOfUniquePoints, func);
+                                       initial_seed, checkDegeneratePoints, listOfUniquePoints, func);
       } else {
         int maxTrialsRemainder = ransacMaxTrials - splitTrials * (nbThreads-1);
         ransac_func[i] = RansacFunctor(cMo, ransacNbInlierConsensus, maxTrialsRemainder, ransacThreshold,
-                                       initial_seed, ransacFlags, listOfUniquePoints, func);
+                                       initial_seed, checkDegeneratePoints, listOfUniquePoints, func);
       }
 
       threads[(size_t) i] = new vpThread((vpThread::Fn) poseRansacImplThread, (vpThread::Args) &ransac_func[ i]);
@@ -742,30 +756,12 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       }
     }
 
-//    double best_residual = std::numeric_limits<double>::max();
-//    vpHomogeneousMatrix best_cMo = cMo;
-//    bool successRansac = false;
-
-//    for(size_t i = 0; i < (size_t) nbThreads; i++) {
-//      if(ransac_func[i].getResult()) {
-//        successRansac = true;
-
-//        double current_residual = final_pose.computeResidual(ransac_func[i].getEstimatedPose());
-//        if(current_residual < best_residual) {
-//          best_residual = current_residual;
-//          best_cMo = ransac_func[i].getEstimatedPose();
-//          nbInliers = ransac_func[i].getNbInliers();
-//          best_consensus = ransac_func[i].getBestConsensus();
-//        }
-//      }
-//    }
-
     foundSolution = successRansac;
 #endif
   } else {
     //Sequential RANSAC
     RansacFunctor sequentialRansac(cMo, ransacNbInlierConsensus, ransacMaxTrials, ransacThreshold,
-                                   0, ransacFlags, listOfUniquePoints, func);
+                                   0, checkDegeneratePoints, listOfUniquePoints, func);
     sequentialRansac();
     foundSolution = sequentialRansac.getResult();
 
@@ -797,11 +793,11 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
     //Even if the cardinality of the best consensus set is inferior to ransacNbInlierConsensus,
     //we want to refine the solution with data in best_consensus and return this pose.
     //This is an approach used for example in p118 in Multiple View Geometry in Computer Vision, Hartley, R.~I. and Zisserman, A.
-    if(/*nbInliers*/best_consensus.size() >= nbMinRandom) //if(nbInliers >= (unsigned)ransacNbInlierConsensus)
+    if(nbInliers >= nbMinRandom) //if(nbInliers >= (unsigned)ransacNbInlierConsensus)
     {
       //Refine the solution using all the points in the consensus set and with VVS pose estimation
       vpPose pose;
-      for(unsigned i = 0 ; i < best_consensus.size(); i++)
+      for(size_t i = 0 ; i < best_consensus.size(); i++)
       {
         vpPoint pt = listOfUniquePoints[best_consensus[i]];
 
