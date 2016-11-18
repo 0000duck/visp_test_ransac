@@ -229,7 +229,7 @@ bool vpPose::RansacFunctor::poseRansacImpl() {
       unsigned int r_ = (unsigned int) rand_r(&m_initial_seed) % size;
       while(usedPt[r_]) {
         //If already picked, pick another point randomly
-        r_ = (unsigned int) rand() % size;
+        r_ = (unsigned int) rand_r(&m_initial_seed) % size;
       }
       //Mark this point as already picked
       usedPt[r_] = true;
@@ -769,7 +769,7 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
 #endif
   } else {
     //Sequential RANSAC
-#if 1
+#if 0
     RansacFunctor sequentialRansac(cMo, ransacNbInlierConsensus, ransacMaxTrials, ransacThreshold,
                                    0, ransacFlags, listOfUniquePoints, func);
     sequentialRansac();
@@ -780,6 +780,7 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
       best_consensus = sequentialRansac.getBestConsensus();
     }
 #else
+    unsigned int initial_seed = 0;
     while (nbTrials < ransacMaxTrials && nbInliers < (unsigned) ransacNbInlierConsensus)
     {
       //Hold the list of the index of the inliers (points in the consensus set)
@@ -805,10 +806,12 @@ bool vpPose::poseRansac(vpHomogeneousMatrix & cMo, bool (*func)(vpHomogeneousMat
         }
 
         //Pick a point randomly
-        unsigned int r_ = (unsigned int) rand() % size;
+//        unsigned int r_ = (unsigned int) rand() % size;
+        unsigned int r_ = (unsigned int) rand_r(&initial_seed) % size;
         while(usedPt[r_]) {
           //If already picked, pick another point randomly
-          r_ = (unsigned int) rand() % size;
+//          r_ = (unsigned int) rand() % size;
+          r_ = (unsigned int) rand_r(&initial_seed) % size;
         }
         //Mark this point as already picked
         usedPt[r_] = true;
